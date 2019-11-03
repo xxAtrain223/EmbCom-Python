@@ -1,0 +1,9 @@
+.vs/
+.vscode/
+
+build/
+vs_build/
+gcc_build/
+bin/
+
+docs/
