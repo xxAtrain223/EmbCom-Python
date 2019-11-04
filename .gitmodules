@@ -4,3 +4,9 @@
 [submodule "ext/pybind11"]
 	path = ext/pybind11
 	url = https://github.com/pybind/pybind11.git
+[submodule "ext/sini"]
+	path = ext/sini
+	url = https://github.com/xxAtrain223/sini.git
+[submodule "ext/serial"]
+	path = ext/serial
+	url = https://github.com/xxAtrain223/serial.git

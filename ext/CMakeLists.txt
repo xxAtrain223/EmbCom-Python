@@ -3,3 +3,5 @@ project(ext)
 
 add_subdirectory(EmbCom)
 add_subdirectory(pybind11)
+add_subdirectory(sini)
+add_subdirectory(serial)
