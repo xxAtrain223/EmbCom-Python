@@ -156,7 +156,15 @@ PYBIND11_MODULE(EmbComPython, m) {
                 parameters.emplace_back(PythonArgToData(parameterTypes[i], args[i]));
             }
 
-            return builder.execute(parameters);
+            std::shared_ptr<Command> command = builder.execute(parameters);
+
+            std::exception_ptr eptr = command->getException();
+            if (eptr != nullptr)
+            {
+                std::rethrow_exception(eptr);
+            }
+
+            return command;
         }, py::is_operator());
 
     py::class_<Command, std::shared_ptr<Command>>(m, "Command")
