@@ -1,4 +1,5 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 namespace py = pybind11;
 
 #include <EmbCom/Device.hpp>
@@ -133,12 +134,16 @@ PYBIND11_MODULE(EmbComPython, m) {
         .def(py::init<const std::string&>())
         .def("__getitem__", [](const SerialDevice& device, const std::string& str) {
             return device[str];
-        }, py::is_operator());
+        }, py::is_operator())
+        .def_property_readonly("appendages", &SerialDevice::getAppendages)
+        .def("stop", &SerialDevice::stop);
 
     py::class_<Appendage>(m, "Appendage")
         .def("__getitem__", [](const Appendage& appendage, const std::string& str) {
             return appendage[str];
-        }, py::is_operator());
+        }, py::is_operator())
+        .def_property_readonly("commands", &Appendage::getCommands)
+        .def("stop", &Appendage::stop);
 
     py::class_<CommandBuilder>(m, "CommandBuilder")
         .def("__call__", [](const CommandBuilder& builder, py::args args) {
@@ -165,10 +170,21 @@ PYBIND11_MODULE(EmbComPython, m) {
             }
 
             return command;
-        }, py::is_operator());
+        }, py::is_operator())
+        .def_property_readonly("parameters", &CommandBuilder::getParameters);
 
     py::class_<Command, std::shared_ptr<Command>>(m, "Command")
         .def("__getitem__", [](const std::shared_ptr<Command>& command, const std::string& str) {
             return DataToPythonArg(command->getReturnValue(str));
-        }, py::is_operator());
+        }, py::is_operator())
+        .def_property_readonly("return_values", [](const std::shared_ptr<Command>& command) {
+            std::map<std::string, py::object> rvs;
+
+            for (std::pair<std::string, std::shared_ptr<Data>> rv : command->getReturnValues())
+            {
+                rvs.emplace(rv.first, DataToPythonArg(*rv.second));
+            }
+
+            return rvs;
+        });
 }
