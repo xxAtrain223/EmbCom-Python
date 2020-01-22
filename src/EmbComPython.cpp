@@ -98,7 +98,7 @@ Data PythonArgToData(const Data::Type type, const py::handle arg)
     return rv;
 }
 
-py::object DataToPythonArg(const Data& value)
+py::object DataToPythonObject(const Data& value)
 {
     switch (value.getType())
     {
@@ -127,6 +127,88 @@ py::object DataToPythonArg(const Data& value)
     }
 }
 
+std::string CommandBuilderToString(const CommandBuilder& builder)
+{
+    std::string parameters = "";
+
+    for (std::tuple<std::string, std::string> parameter : builder.getParameters())
+    {
+        parameters += std::get<0>(parameter) + " " + std::get<1>(parameter) + ", ";
+    }
+
+    if (!parameters.empty())
+    {
+        parameters.pop_back();
+        parameters.pop_back();
+    }
+
+    std::string returnValues = "";
+
+    for (std::tuple<std::string, std::string> returnValue : builder.getReturnValues())
+    {
+        returnValues += std::get<0>(returnValue) + " " + std::get<1>(returnValue) + ", ";
+    }
+
+    if (!returnValues.empty())
+    {
+        returnValues.pop_back();
+        returnValues.pop_back();
+    }
+
+    return "(" + parameters + ") -> (" + returnValues + ")";
+}
+
+std::string AppendageToString(const Appendage& appendage, bool indent = false)
+{
+    std::string rv = "";
+
+    for (std::pair<std::string, CommandBuilder> command : appendage.getCommands())
+    {
+        rv += (indent ? "    " : "") + command.first + CommandBuilderToString(command.second) + "\n";
+    }
+
+    if (!rv.empty())
+    {
+        rv.pop_back();
+    }
+
+    return rv;
+}
+
+std::string DeviceToString(const SerialDevice& device)
+{
+    std::string rv = "";
+
+    for (std::pair<std::string, Appendage> appendage : device.getAppendages())
+    {
+        rv += appendage.first + ":\n" + AppendageToString(appendage.second, true) + "\n";
+    }
+
+    if (!rv.empty())
+    {
+        rv.pop_back();
+    }
+
+    return rv;
+}
+
+std::string CommandToString(const std::shared_ptr<Command>& command)
+{
+    std::string rv = "";
+
+    for (std::pair<std::string, std::shared_ptr<Data>> returnValue : command->getReturnValues())
+    {
+        rv += returnValue.first + ": " + DataToPythonObject(*returnValue.second).str().cast<std::string>() + "\n";
+    }
+
+    if (!rv.empty())
+    {
+        rv.pop_back();
+    }
+
+    return rv;
+}
+
 PYBIND11_MODULE(EmbComPython, m) {
     m.doc() = "pybind11 example plugin"; // optional module docstring
 
@@ -136,14 +218,18 @@ PYBIND11_MODULE(EmbComPython, m) {
             return device[str];
         }, py::is_operator())
         .def_property_readonly("appendages", &SerialDevice::getAppendages)
-        .def("stop", &SerialDevice::stop);
+        .def("stop", &SerialDevice::stop)
+        .def("__str__", &DeviceToString)
+        .def("__repr__", &DeviceToString);
 
     py::class_<Appendage>(m, "Appendage")
         .def("__getitem__", [](const Appendage& appendage, const std::string& str) {
             return appendage[str];
         }, py::is_operator())
         .def_property_readonly("commands", &Appendage::getCommands)
-        .def("stop", &Appendage::stop);
+        .def("stop", &Appendage::stop)
+        .def("__str__", &AppendageToString, py::arg("indent") = false);
+        //.def("__repr__", &AppendageToString, py::arg("indent") = false);
 
     py::class_<CommandBuilder>(m, "CommandBuilder")
         .def("__call__", [](const CommandBuilder& builder, py::args args) {
@@ -171,20 +257,24 @@ PYBIND11_MODULE(EmbComPython, m) {
 
             return command;
         }, py::is_operator())
-        .def_property_readonly("parameters", &CommandBuilder::getParameters);
+        .def_property_readonly("parameters", &CommandBuilder::getParameters)
+        .def("__str__", &CommandBuilderToString);
+        //.def("__repr__", &CommandBuilderToString);
 
     py::class_<Command, std::shared_ptr<Command>>(m, "Command")
         .def("__getitem__", [](const std::shared_ptr<Command>& command, const std::string& str) {
-            return DataToPythonArg(command->getReturnValue(str));
+            return DataToPythonObject(command->getReturnValue(str));
         }, py::is_operator())
         .def_property_readonly("return_values", [](const std::shared_ptr<Command>& command) {
             std::map<std::string, py::object> rvs;
 
             for (std::pair<std::string, std::shared_ptr<Data>> rv : command->getReturnValues())
             {
-                rvs.emplace(rv.first, DataToPythonArg(*rv.second));
+                rvs.emplace(rv.first, DataToPythonObject(*rv.second));
             }
 
             return rvs;
-        });
+        })
+        .def("__str__", &CommandToString);
+        //.def("__repr__", &CommandToString);
 }
