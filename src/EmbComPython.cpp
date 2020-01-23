@@ -1,7 +1,9 @@
 #include <pybind11/pybind11.h>
+#include <pybind11/functional.h>
 #include <pybind11/stl.h>
 namespace py = pybind11;
 
+#include <EmbMessenger/DebugBuffer.hpp>
 #include <EmbCom/Device.hpp>
 #include <EmbCom/Exceptions.hpp>
 #include "SerialBuffer.hpp"
@@ -51,6 +53,17 @@ class SerialDevice : public Device
 public:
     SerialDevice(const std::string& configFolderStr) :
         Device(configFolderStr, makeBuffer(configFolderStr))
+    {
+    }
+
+    friend class DebugSerialDevice;
+};
+
+class DebugSerialDevice : public Device
+{
+public:
+    DebugSerialDevice(const std::string& configFolderStr, const std::function<void(std::string)>& printFunc) :
+        Device(configFolderStr, std::make_shared<emb::host::DebugBuffer>(SerialDevice::makeBuffer(configFolderStr), printFunc))
     {
     }
 };
@@ -175,7 +188,7 @@ std::string AppendageToString(const Appendage& appendage, bool indent = false)
     return rv;
 }
 
-std::string DeviceToString(const SerialDevice& device)
+std::string DeviceToString(const Device& device)
 {
     std::string rv = "";
 
@@ -213,12 +226,23 @@ PYBIND11_MODULE(EmbComPython, m) {
     m.doc() = "pybind11 example plugin"; // optional module docstring
 
     py::class_<SerialDevice>(m, "SerialDevice")
-        .def(py::init<const std::string&>())
+        .def(py::init<const std::string&>(), py::arg("configFolderStr"))
         .def("__getitem__", [](const SerialDevice& device, const std::string& str) {
             return device[str];
         }, py::is_operator())
         .def_property_readonly("appendages", &SerialDevice::getAppendages)
         .def("stop", &SerialDevice::stop)
+        .def("__str__", &DeviceToString)
+        .def("__repr__", &DeviceToString);
+
+    py::class_<DebugSerialDevice>(m, "DebugSerialDevice")
+        .def(py::init<const std::string&, const std::function<void(std::string)>&>(),
+            py::arg("configFolderStr"), py::arg("printFunc") = py::cpp_function([](std::string str) { py::print("debug"); py::print(str); }))
+        .def("__getitem__", [](const DebugSerialDevice& device, const std::string& str) {
+            return device[str];
+        }, py::is_operator())
+        .def_property_readonly("appendages", &DebugSerialDevice::getAppendages)
+        .def("stop", &DebugSerialDevice::stop)
         .def("__str__", &DeviceToString)
         .def("__repr__", &DeviceToString);
 
