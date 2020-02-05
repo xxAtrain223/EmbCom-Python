@@ -16,18 +16,18 @@ protected:
     uint8_t m_streamFront, m_readFront;
     uint8_t m_numberMessages;
 
+    emb::shared::DataType m_readType, m_writeType;
+    uint8_t m_readBytes, m_writeBytes;
+
 public:
     SerialBuffer(std::string port) :
         m_serial(port)
     {
-        m_streamFront = 0;
-        m_readFront = 0;
-        m_numberMessages = 0;
+        zero();
     }
 
     void writeByte(const uint8_t byte) override
     {
-        //serial_write(m_serial, &byte, 1);
         m_serial.write(&byte, 1);
     }
 
@@ -39,10 +39,22 @@ public:
     uint8_t readByte() override
     {
         uint8_t byte = m_buffer[m_readFront];
-        if (m_buffer[(BufferSize + m_readFront - 1) % BufferSize] == emb::shared::DataType::kEndOfMessage)
+
+        if (m_readBytes == 0)
+        {
+            m_readType = (emb::shared::DataType)byte;
+            m_readBytes = emb::shared::dataBytes(m_readType);
+        }
+        else
+        {
+            --m_readBytes;
+        }
+
+        if (m_readBytes == 0 && m_readType == emb::shared::DataType::kEndOfMessage)
         {
             --m_numberMessages;
         }
+
         m_readFront = (m_readFront + 1) % BufferSize;
         return byte;
     }
@@ -67,10 +79,23 @@ public:
         while (m_serial.available() > 0)
         {
             m_serial.read(m_buffer + m_streamFront, 1);
-            if (m_buffer[(BufferSize + m_streamFront - 1) % BufferSize] == emb::shared::DataType::kEndOfMessage)
+            uint8_t byte = m_buffer[m_streamFront];
+
+            if (m_writeBytes == 0)
+            {
+                m_writeType = (emb::shared::DataType)byte;
+                m_writeBytes = emb::shared::dataBytes(m_writeType);
+            }
+            else
+            {
+                --m_writeBytes;
+            }
+
+            if (m_writeBytes == 0 && m_writeType == emb::shared::DataType::kEndOfMessage)
             {
                 ++m_numberMessages;
             }
+
             m_streamFront = (m_streamFront + 1) % BufferSize;
         }
     }
@@ -80,6 +105,11 @@ public:
         m_streamFront = 0;
         m_readFront = 0;
         m_numberMessages = 0;
+
+        m_readType = emb::shared::DataType::kNull;
+        m_readBytes = 0;
+        m_writeType = emb::shared::DataType::kNull;
+        m_writeBytes = 0;
 
         for (uint8_t i = 0; i < BufferSize; i++)
         {

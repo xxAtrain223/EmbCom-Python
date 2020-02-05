@@ -62,8 +62,8 @@ public:
 class DebugSerialDevice : public Device
 {
 public:
-    DebugSerialDevice(const std::string& configFolderStr, const std::function<void(std::string)>& printFunc) :
-        Device(configFolderStr, std::make_shared<emb::host::DebugBuffer>(SerialDevice::makeBuffer(configFolderStr), printFunc))
+    DebugSerialDevice(const std::string& configFolderStr) :
+        Device(configFolderStr, std::make_shared<emb::host::DebugBuffer>(SerialDevice::makeBuffer(configFolderStr), [](std::string str) { py::print(str); }))
     {
     }
 };
@@ -236,8 +236,7 @@ PYBIND11_MODULE(EmbComPython, m) {
         .def("__repr__", &DeviceToString);
 
     py::class_<DebugSerialDevice>(m, "DebugSerialDevice")
-        .def(py::init<const std::string&, const std::function<void(std::string)>&>(),
-            py::arg("configFolderStr"), py::arg("printFunc") = py::cpp_function([](std::string str) { py::print("debug"); py::print(str); }))
+        .def(py::init<const std::string&>(), py::arg("configFolderStr"))
         .def("__getitem__", [](const DebugSerialDevice& device, const std::string& str) {
             return device[str];
         }, py::is_operator())
@@ -251,7 +250,6 @@ PYBIND11_MODULE(EmbComPython, m) {
             return appendage[str];
         }, py::is_operator())
         .def_property_readonly("commands", &Appendage::getCommands)
-        .def("stop", &Appendage::stop)
         .def("__str__", &AppendageToString, py::arg("indent") = false);
         //.def("__repr__", &AppendageToString, py::arg("indent") = false);
 
